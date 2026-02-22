@@ -25,7 +25,7 @@
 		changeOverTempCooling: 23
 	});
 
-	const MQTT_BROKER = 'ws://mqapi.uniluxthermostat.com:8083';
+	const MQTT_BROKER = 'wss://mqapi.uniluxthermostat.com:8083';
 	
 	function getTopicResponse(id: string) { return `${id}/v1/devices/me/rpc/response/0`; }
 	function getTopicAttributes(id: string) { return `${id}/v1/devices/me/attributes`; }
