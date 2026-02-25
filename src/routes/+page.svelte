@@ -10,7 +10,7 @@
 	
 	let thermostatState = $state({
 		controlMode: 'Off', // On, Off
-		spValue: 0,
+		spValue: 20,
 		mainMode: '2P', 
 		fanMode: 'Low', // Auto, Low, Medium, High
 		tempUnit: '°C',
@@ -25,8 +25,8 @@
 		changeOverTempCooling: 23
 	});
 
-	const MQTT_BROKER = 'wss://mqapi.uniluxthermostat.com:8083';
-	
+	const MQTT_BROKER = 'ws://mqapi.uniluxthermostat.com:8083';
+
 	function getTopicResponse(id: string) { return `${id}/v1/devices/me/rpc/response/0`; }
 	function getTopicAttributes(id: string) { return `${id}/v1/devices/me/attributes`; }
 	function getTopicTelemetry(id: string) { return `${id}/v1/devices/me/telemetry`; }
@@ -37,8 +37,18 @@
 	const STEP = 0.5;
 	
 	let angleRad = $derived((180 - (thermostatState.spValue - MIN_TEMP) / (MAX_TEMP - MIN_TEMP) * 180) * (Math.PI / 180));
+	let ratio = $derived((thermostatState.spValue - MIN_TEMP) / (MAX_TEMP - MIN_TEMP));
 
 	let isDragging = $state(false);
+	let isDarkMode = $state(true);
+	let spValueTimeout: ReturnType<typeof setTimeout> | null = null;
+
+	function toggleDarkMode() {
+		isDarkMode = !isDarkMode;
+		if (typeof document !== 'undefined') {
+			document.documentElement.classList.toggle('light-mode', !isDarkMode);
+		}
+	}
 
 	function updateTempFromAngle(angle: number) {
 		// angle from 0 to 180 (semi-circle)
@@ -78,7 +88,7 @@
 		if (!svg) return;
 		const rect = svg.getBoundingClientRect();
 		const centerX = rect.left + rect.width / 2;
-		const centerY = rect.bottom; // Semi-circle bottom center
+		const centerY = rect.top + (rect.height * 100 / 120); // Arc center at y=100 in 120-height viewBox
 
 		const dx = e.clientX - centerX;
 		const dy = e.clientY - centerY;
@@ -178,13 +188,21 @@
 	onDestroy(() => {
 		window.removeEventListener('mouseup', handleMouseUp);
 		window.removeEventListener('mousemove', handleMouseMove);
+		if (spValueTimeout) clearTimeout(spValueTimeout);
 		client?.end();
 	});
 
 	function publishUpdate(update: Partial<typeof thermostatState>) {
 		if (client && isConnected && deviceId) {
 			const newState = { ...thermostatState, ...update };
-			client.publish(getTopicRequest(deviceId), JSON.stringify(newState));
+			if (update.spValue !== undefined) {
+				if (spValueTimeout) clearTimeout(spValueTimeout);
+				spValueTimeout = setTimeout(() => {
+					client?.publish(getTopicRequest(deviceId), JSON.stringify({ "method": "remoteSetSpValue", "params": update.spValue }));
+				}, 1500);
+			} else {
+				client.publish(getTopicRequest(deviceId), JSON.stringify(newState));
+			}
 			// Optimistically update UI
 			thermostatState = newState;
 		}
@@ -238,6 +256,9 @@
 <main class="container">
 	<header>
 		<h1>Unilux Thermostat</h1>
+		<button class="theme-toggle" onclick={toggleDarkMode} aria-label="Toggle Dark Mode">
+			{isDarkMode ? '🌙' : '☀️'}
+		</button>
 	</header>
 
 	<div class="status-banner" class:connected={isConnected}>
@@ -253,19 +274,36 @@
 	<section class="card thermostat-main">
 		<div class="power-control">
 			<button class="power-btn" class:on={thermostatState.controlMode === 'On'} onclick={togglePower}>
+				<span class="power-icon">⏻</span>
 				{thermostatState.controlMode === 'On' ? 'Power On' : 'Power Off'}
 			</button>
 		</div>
 
 		<div class="temp-slider">
-			<svg viewBox="0 0 200 110" 
+			<svg viewBox="0 0 200 120" 
 				onmousedown={handleMouseDown}
 				ontouchmove={handleTouchMove}
 				class:disabled={thermostatState.controlMode !== 'On'}>
+				<defs>
+					<linearGradient id="activeGradient" x1="20" y1="100" x2="180" y2="100" gradientUnits="userSpaceOnUse">
+						<stop offset="0%" stop-color="#00f2fe" />
+						<stop offset="50%" stop-color="#3b82f6" />
+						<stop offset="50%" stop-color="#fbbf24" />
+						<stop offset="100%" stop-color="#ef4444" />
+					</linearGradient>
+					<filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+						<feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+						<feMerge>
+							<feMergeNode in="coloredBlur"/>
+							<feMergeNode in="SourceGraphic"/>
+						</feMerge>
+					</filter>
+				</defs>
+				
 				<!-- Background Track -->
 				<path d="M 20 100 A 80 80 0 0 1 180 100" 
 					fill="none" 
-					stroke="#eee" 
+					stroke="var(--track-bg)" 
 					stroke-width="12" 
 					stroke-linecap="round" />
 				
@@ -273,28 +311,30 @@
 				<path d="M 20 100 A 80 80 0 0 1 {100 + 80 * Math.cos(angleRad)} {100 - 80 * Math.sin(angleRad)}" 
 					class="active-path"
 					fill="none" 
-					stroke="#1890ff" 
+					stroke="url(#activeGradient)" 
 					stroke-width="12" 
-					stroke-linecap="round" />
+					stroke-linecap="round"
+					filter="url(#glow)" />
 
 				<!-- Thumb -->
 				<circle 
 					cx={100 + 80 * Math.cos(angleRad)} 
 					cy={100 - 80 * Math.sin(angleRad)} 
-					r="10" 
+					r="12" 
 					fill="white" 
-					stroke="#1890ff" 
-					stroke-width="3" />
+					stroke={ratio < 0.5 ? '#3b82f6' : '#ef4444'} 
+					stroke-width="3"
+					filter="url(#glow)" />
 			</svg>
 			
 			<div class="temp-display-large">
-				<div class="room-temp">Room: {roomTemp.toFixed(1)}°C</div>
-				<div class="current-temp">{thermostatState.spValue.toFixed(1)}°C</div>
+				<div class="room-temp">Room {roomTemp.toFixed(1)}°</div>
+				<div class="current-temp">{thermostatState.spValue.toFixed(1)}°</div>
 			</div>
 
 			<div class="temp-controls">
-				<button disabled={thermostatState.controlMode !== 'On'} onclick={() => adjustTemperature(-0.5)}>-</button>
-				<button disabled={thermostatState.controlMode !== 'On'} onclick={() => adjustTemperature(0.5)}>+</button>
+				<button disabled={thermostatState.controlMode !== 'On'} onclick={() => adjustTemperature(-0.5)} aria-label="Decrease Temperature">−</button>
+				<button disabled={thermostatState.controlMode !== 'On'} onclick={() => adjustTemperature(0.5)} aria-label="Increase Temperature">+</button>
 			</div>
 		</div>
 	</section>
@@ -329,91 +369,196 @@
 				{/each}
 			</div>
 		</div>
+
+		<div class="card settings-summary">
+			<h3>Settings</h3>
+			<div class="settings-grid">
+				<div class="setting-item">
+					<span class="label">Unit</span>
+					<span class="value">{thermostatState.tempUnit}</span>
+				</div>
+				<div class="setting-item">
+					<span class="label">Format</span>
+					<span class="value">{thermostatState.timeFormat}</span>
+				</div>
+				<div class="setting-item">
+					<span class="label">Vacation</span>
+					<span class="value">{thermostatState.vacationHold > 0 ? 'On' : 'Off'}</span>
+				</div>
+				<div class="setting-item">
+					<span class="label">Diff (H/C)</span>
+					<span class="value">{thermostatState.switchingDiffHeating}/{thermostatState.switchingDiffCooling}</span>
+				</div>
+			</div>
+		</div>
 	</section>
 </main>
 
 <style>
+	:global(:root) {
+		--bg-gradient: radial-gradient(circle at top, #1e293b, #0f172a);
+		--text-main: #f8fafc;
+		--text-muted: #64748b;
+		--text-bright: #94a3b8;
+		--card-bg: rgba(30, 41, 59, 0.5);
+		--card-bg-alt: rgba(30, 41, 59, 0.7);
+		--btn-bg: rgba(15, 23, 42, 0.4);
+		--border-color: rgba(255, 255, 255, 0.05);
+		--border-btn: rgba(255, 255, 255, 0.1);
+		--accent-glow: rgba(59, 130, 246, 0.2);
+		--heading-gradient: linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%);
+		--track-bg: rgba(255, 255, 255, 0.1);
+	}
+
+	:global(.light-mode) {
+		--bg-gradient: radial-gradient(circle at top, #f1f5f9, #e2e8f0);
+		--text-main: #0f172a;
+		--text-muted: #64748b;
+		--text-bright: #334155;
+		--card-bg: rgba(255, 255, 255, 0.7);
+		--card-bg-alt: rgba(255, 255, 255, 0.9);
+		--btn-bg: rgba(255, 255, 255, 0.5);
+		--border-color: rgba(15, 23, 42, 0.05);
+		--border-btn: rgba(15, 23, 42, 0.1);
+		--accent-glow: rgba(59, 130, 246, 0.1);
+		--heading-gradient: linear-gradient(135deg, #1e293b 0%, #475569 100%);
+		--track-bg: rgba(15, 23, 42, 0.1);
+	}
+
 	:global(body) {
-		background-color: #f0f2f5;
-		font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+		background: var(--bg-gradient);
+		font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 		margin: 0;
-		color: #333;
+		color: var(--text-main);
+		min-height: 100vh;
+		transition: background 0.3s ease, color 0.3s ease;
 	}
 
 	.container {
-		max-width: 500px;
+		max-width: 480px;
 		margin: 0 auto;
-		padding: 20px;
+		padding: 24px;
 	}
 
 	header {
-		text-align: center;
-		margin-bottom: 10px;
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 24px;
 	}
 
 	h1 {
 		margin: 0;
+		font-size: 1.5rem;
+		font-weight: 700;
+		background: var(--heading-gradient);
+		-webkit-background-clip: text;
+		-webkit-text-fill-color: transparent;
+	}
+
+	.theme-toggle {
+		background: var(--btn-bg);
+		border: 1px solid var(--border-btn);
+		color: var(--text-main);
+		width: 40px;
+		height: 40px;
+		border-radius: 12px;
+		cursor: pointer;
+		display: flex;
+		align-items: center;
+		justify-content: center;
 		font-size: 1.2rem;
-		color: #666;
+		transition: all 0.2s;
+	}
+
+	.theme-toggle:hover {
+		transform: scale(1.05);
+		background: var(--card-bg-alt);
 	}
 
 	.status-banner {
 		text-align: center;
-		font-size: 1.2rem;
-		font-weight: bold;
-		padding: 12px;
-		border-radius: 8px;
-		background: #ff4d4f;
-		color: white;
-		margin-bottom: 20px;
-		box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-		transition: all 0.3s;
+		font-size: 0.85rem;
+		font-weight: 600;
+		padding: 8px 16px;
+		border-radius: 20px;
+		background: rgba(239, 68, 68, 0.1);
+		color: #ef4444;
+		margin-bottom: 24px;
+		width: fit-content;
+		margin-left: auto;
+		margin-right: auto;
+		border: 1px solid rgba(239, 68, 68, 0.2);
+		transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 	}
 
 	.status-banner.connected {
-		background: #52c41a;
+		background: rgba(34, 197, 94, 0.1);
+		color: #22c55e;
+		border-color: rgba(34, 197, 94, 0.2);
 	}
 
 	.device-id-display {
 		text-align: center;
-		font-size: 0.9rem;
-		color: #888;
-		margin-top: -10px;
-		margin-bottom: 20px;
+		font-size: 0.75rem;
+		color: var(--text-muted);
+		margin-top: -16px;
+		margin-bottom: 24px;
 	}
 
 	.device-id-display span {
-		font-weight: 500;
-		color: #555;
+		font-weight: 600;
+		color: var(--text-bright);
 	}
 
 	.card {
-		background: white;
-		border-radius: 12px;
-		padding: 20px;
-		box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-		margin-bottom: 20px;
+		background: var(--card-bg);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+		border: 1px solid var(--border-color);
+		border-radius: 24px;
+		padding: 24px;
+		margin-bottom: 24px;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+		transition: background 0.3s ease, border-color 0.3s ease;
 	}
 
 	.thermostat-main {
 		text-align: center;
+		background: var(--card-bg-alt);
+	}
+
+	.power-control {
+		margin-bottom: 24px;
 	}
 
 	.power-btn {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
 		width: 100%;
-		padding: 12px;
-		border: none;
-		border-radius: 8px;
-		background: #d9d9d9;
-		color: #555;
-		font-weight: bold;
+		padding: 14px;
+		border: 1px solid var(--border-btn);
+		border-radius: 16px;
+		background: var(--btn-bg);
+		color: var(--text-muted);
+		font-weight: 600;
 		cursor: pointer;
 		transition: all 0.3s;
 	}
 
+	.power-icon {
+		font-size: 1.2rem;
+	}
+
 	.power-btn.on {
-		background: #1890ff;
-		color: white;
+		background: rgba(37, 99, 235, 0.2);
+		color: #3b82f6;
+		border-color: rgba(37, 99, 235, 0.3);
+		box-shadow: 0 0 20px rgba(37, 99, 235, 0.1);
 	}
 
 	.temp-slider {
@@ -424,81 +569,142 @@
 
 	.temp-slider svg {
 		width: 100%;
-		max-width: 300px;
+		max-width: 320px;
 		height: auto;
 		cursor: pointer;
 	}
 
 	.temp-slider svg.disabled {
 		cursor: not-allowed;
-		opacity: 0.5;
+		opacity: 0.3;
 	}
 
 	.active-path {
-		transition: stroke-dasharray 0.1s ease-out;
+		transition: stroke-dasharray 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 	}
 
 	.temp-display-large {
 		position: absolute;
-		bottom: 50px;
+		bottom: 60px;
 		left: 0;
 		right: 0;
 		pointer-events: none;
 	}
 
 	.room-temp {
-		font-size: 1.1rem;
-		color: #888;
-		margin-bottom: 2px;
+		font-size: 0.9rem;
+		color: var(--text-muted);
+		margin-bottom: 4px;
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
 	}
 
 	.current-temp {
-		font-size: 3.5rem;
-		font-weight: bold;
+		font-size: 4rem;
+		font-weight: 800;
 		line-height: 1;
+		color: var(--text-main);
+		text-shadow: 0 0 30px var(--accent-glow);
 	}
 
 	.temp-controls {
 		display: flex;
-		justify-content: center;
-		gap: 125px;
-		margin-top: 15px;
+		justify-content: space-between;
+		width: 80%;
+		margin: 0 auto;
+		margin-top: 10px;
 	}
 
 	.temp-controls button {
-		width: 50px;
-		height: 50px;
-		border-radius: 25px;
-		border: 1px solid #d9d9d9;
-		background: white;
+		width: 44px;
+		height: 44px;
+		border-radius: 12px;
+		border: 1px solid var(--border-btn);
+		background: var(--btn-bg);
+		color: var(--text-main);
 		font-size: 1.5rem;
 		cursor: pointer;
+		transition: all 0.2s;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	.temp-controls button:active {
+		transform: scale(0.95);
+		background: var(--card-bg-alt);
+	}
+
+	.controls-grid h3 {
+		font-size: 0.75rem;
+		text-transform: uppercase;
+		letter-spacing: 0.1em;
+		color: var(--text-muted);
+		margin: 0 0 16px 0;
 	}
 
 	.btn-group {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 10px;
+		gap: 8px;
 	}
 
 	.btn-group button {
 		flex: 1;
-		min-width: 80px;
-		padding: 8px;
-		border: 1px solid #d9d9d9;
-		background: white;
-		border-radius: 6px;
+		min-width: 70px;
+		padding: 10px;
+		border: 1px solid var(--border-color);
+		background: var(--btn-bg);
+		color: var(--text-muted);
+		border-radius: 12px;
 		cursor: pointer;
+		font-size: 0.75rem;
+		font-weight: 600;
+		transition: all 0.2s;
 	}
 
 	.btn-group button.active {
-		background: #1890ff;
-		color: white;
-		border-color: #1890ff;
+		background: rgba(37, 99, 235, 0.2);
+		color: #3b82f6;
+		border-color: rgba(37, 99, 235, 0.3);
+	}
+
+	.settings-grid {
+		display: grid;
+		grid-template-columns: repeat(2, 1fr);
+		gap: 12px;
+	}
+
+	.setting-item {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+	}
+
+	.setting-item .label {
+		font-size: 0.65rem;
+		color: var(--text-muted);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.setting-item .value {
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: var(--text-bright);
 	}
 
 	button:disabled {
-		opacity: 0.5;
+		opacity: 0.3;
 		cursor: not-allowed;
+	}
+
+	@media (max-width: 400px) {
+		.container {
+			padding: 16px;
+		}
+		.current-temp {
+			font-size: 3rem;
+		}
 	}
 </style>

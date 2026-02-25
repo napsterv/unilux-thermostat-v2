@@ -1,1 +1,0 @@
-# unilux-thermostat-android
