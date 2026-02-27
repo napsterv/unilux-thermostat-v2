@@ -1,17 +1,46 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
-	import { Thermostat } from '$lib/thermostat.svelte';
-	import './page.css';
+	import { createThermostatStore, MIN_TEMP, MAX_TEMP } from '$lib/stores/thermostat.svelte';
+	import { createMqttClient } from '$lib/services/mqtt-client.svelte';
+	import ThermostatHeader from '$lib/components/ThermostatHeader.svelte';
+	import PowerControl from '$lib/components/PowerControl.svelte';
+	import TemperatureSlider from '$lib/components/TemperatureSlider.svelte';
+	import ModeSelector from '$lib/components/ModeSelector.svelte';
+	import FanSelector from '$lib/components/FanSelector.svelte';
+	import SettingsSummary from '$lib/components/SettingsSummary.svelte';
 
-	const thermostat = new Thermostat();
+	let deviceId = $state('');
+	const thermostatStore = createThermostatStore();
+	const mqttClient = createMqttClient(thermostatStore);
 
 	onMount(() => {
-		thermostat.init();
+		let storedDeviceId = localStorage.getItem('deviceId');
+		if (!storedDeviceId) {
+			storedDeviceId = prompt('Please enter your Device ID:');
+			if (storedDeviceId) {
+				localStorage.setItem('deviceId', storedDeviceId);
+			}
+		}
+
+		if (storedDeviceId) {
+			console.log(`Using Device ID: ${storedDeviceId}`);
+			deviceId = storedDeviceId;
+			mqttClient.connect(deviceId);
+		}
 	});
 
 	onDestroy(() => {
-		thermostat.destroy();
+		mqttClient.disconnect();
 	});
+
+	function handleSliderChange(value: number) {
+		mqttClient.setSpValue(value);
+	}
+
+	function handleAdjustTemp(delta: number) {
+		const newTemp = thermostatStore.state.spValue + delta;
+		mqttClient.setSpValue(Math.min(MAX_TEMP, Math.max(MIN_TEMP, newTemp)));
+	}
 </script>
 
 <svelte:head>
@@ -19,115 +48,120 @@
 </svelte:head>
 
 <main class="container">
-	<header>
-		<h1>Unilux Thermostat V2</h1>
-		<button class="theme-toggle" onclick={thermostat.toggleDarkMode} aria-label="Toggle Dark Mode">
-			{thermostat.isDarkMode ? '🌙' : '☀️'}
-		</button>
-	</header>
+	<ThermostatHeader />
 
-	<div class="status-banner" class:connected={thermostat.isConnected}>
-		{thermostat.isConnected ? 'Connected' : 'Disconnected'}
+	<div class="connection-status-row">
+		<div class="status-banner" class:connected={mqttClient.isConnected}>
+			{mqttClient.isConnected ? 'Connected' : 'Disconnected'}
+		</div>
+
+		{#if deviceId}
+			<div class="device-id-display">
+				ID: <span>{deviceId}</span>
+			</div>
+		{/if}
 	</div>
 
-	{#if thermostat.deviceId}
-		<div class="device-id-display">
-			Device ID: <span>{thermostat.deviceId}</span>
-		</div>
-	{/if}
-
 	<section class="card thermostat-main">
-		<div class="power-control">
-			<button class="power-btn" class:on={thermostat.thermostatState.controlMode === 'On'} onclick={thermostat.togglePower}>
-				<span class="power-icon">⏻</span>
-				{thermostat.thermostatState.controlMode === 'On' ? 'Power On' : 'Power Off'}
-			</button>
-		</div>
+		<PowerControl controlMode={thermostatStore.state.controlMode} onToggle={mqttClient.togglePower} />
 
-		<div class="temp-slider">
-			<div class="temp-display-large">
-				<div class="room-temp">Room {thermostat.roomTemp.toFixed(1)}°</div>
-				<div class="current-temp">{thermostat.thermostatState.spValue.toFixed(1)}°</div>
-			</div>
-
-			<div class="slider-container">
-				<input 
-					type="range" 
-					min={thermostat.MIN_TEMP} 
-					max={thermostat.MAX_TEMP} 
-					step={thermostat.STEP} 
-					value={thermostat.thermostatState.spValue}
-					oninput={thermostat.handleSliderChange}
-					disabled={thermostat.thermostatState.controlMode !== 'On'}
-					class="horizontal-slider"
-				/>
-				<div class="slider-track-fill" 
-					class:heat={thermostat.thermostatState.changeOverMode === 'Heat'}
-					class:cool={thermostat.thermostatState.changeOverMode === 'Cool'}
-					style="width: {thermostat.ratio * 100}%"
-				></div>
-			</div>
-			
-			<div class="temp-controls">
-				<button disabled={thermostat.thermostatState.controlMode !== 'On'} onclick={() => thermostat.adjustTemperature(-0.5)} aria-label="Decrease Temperature">−</button>
-				<button disabled={thermostat.thermostatState.controlMode !== 'On'} onclick={() => thermostat.adjustTemperature(0.5)} aria-label="Increase Temperature">+</button>
-			</div>
-		</div>
+		<TemperatureSlider
+			spValue={thermostatStore.state.spValue}
+			roomTemp={thermostatStore.roomTemp}
+			ratio={thermostatStore.ratio}
+			controlMode={thermostatStore.state.controlMode}
+			changeOverMode={thermostatStore.state.changeOverMode}
+			onSliderChange={handleSliderChange}
+			onAdjust={handleAdjustTemp}
+		/>
 	</section>
 
 	<section class="controls-grid">
-		<div class="card mode-select">
-			<h3><span class="icon">🌡️</span> Mode</h3>
-			<div class="btn-group">
-				<button 
-					disabled={thermostat.thermostatState.controlMode !== 'On'} 
-					class:active={thermostat.thermostatState.changeOverMode === 'Heat'} 
-					onclick={() => thermostat.setChangeOverMode('Heat')}><span class="icon">🔥</span> HEAT</button>
-				<button 
-					disabled={thermostat.thermostatState.controlMode !== 'On'} 
-					class:active={thermostat.thermostatState.changeOverMode === 'Cool'} 
-					onclick={() => thermostat.setChangeOverMode('Cool')}><span class="icon">❄️</span> COOL</button>
-				<button 
-					disabled={thermostat.thermostatState.controlMode !== 'On'} 
-					class:active={thermostat.thermostatState.changeOverMode === 'Auto'} 
-					onclick={() => thermostat.setChangeOverMode('Auto')}><span class="icon">🔄</span> AUTO</button>
-			</div>
-		</div>
+		<ModeSelector
+			changeOverMode={thermostatStore.state.changeOverMode}
+			controlMode={thermostatStore.state.controlMode}
+			onModeChange={mqttClient.setChangeOverMode}
+		/>
 
-		<div class="card fan-select">
-			<h3><span class="icon">🌀</span> Fan</h3>
-			<div class="btn-group">
-				{#each ['Auto', 'Off', 'Low', 'Med', 'High'] as label}
-					<button 
-						disabled={thermostat.thermostatState.controlMode !== 'On'} 
-						class:active={thermostat.thermostatState.fanMode === label} 
-						onclick={() => thermostat.setFan(label)}>
-						{label.toUpperCase()}
-					</button>
-				{/each}
-			</div>
-		</div>
+		<FanSelector
+			fanMode={thermostatStore.state.fanMode}
+			controlMode={thermostatStore.state.controlMode}
+			onFanChange={mqttClient.setFanMode}
+		/>
 
-		<div class="card settings-summary">
-			<h3>Settings</h3>
-			<div class="settings-grid">
-				<div class="setting-item">
-					<span class="label">Unit</span>
-					<span class="value">{thermostat.thermostatState.tempUnit}</span>
-				</div>
-				<div class="setting-item">
-					<span class="label">Format</span>
-					<span class="value">{thermostat.thermostatState.timeFormat}</span>
-				</div>
-				<div class="setting-item">
-					<span class="label">Vacation</span>
-					<span class="value">{thermostat.thermostatState.vacationHold > 0 ? 'On' : 'Off'}</span>
-				</div>
-				<div class="setting-item">
-					<span class="label">Diff (H/C)</span>
-					<span class="value">{thermostat.thermostatState.switchingDiffHeating}/{thermostat.thermostatState.switchingDiffCooling}</span>
-				</div>
-			</div>
-		</div>
+		<SettingsSummary state={thermostatStore.state} />
 	</section>
 </main>
+
+<style>
+	.container {
+		max-width: 480px;
+		margin: 0 auto;
+		padding: 24px;
+	}
+
+	.connection-status-row {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 12px;
+		margin-bottom: 24px;
+	}
+
+	.status-banner {
+		font-size: 0.75rem;
+		font-weight: 600;
+		padding: 4px 12px;
+		border-radius: 20px;
+		background: rgba(239, 68, 68, 0.1);
+		color: #ef4444;
+		border: 1px solid rgba(239, 68, 68, 0.2);
+		transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+		text-transform: uppercase;
+		letter-spacing: 0.05em;
+	}
+
+	.status-banner.connected {
+		background: rgba(34, 197, 94, 0.1);
+		color: #22c55e;
+		border-color: rgba(34, 197, 94, 0.2);
+	}
+
+	.device-id-display {
+		font-size: 0.75rem;
+		color: var(--text-muted);
+	}
+
+	.device-id-display span {
+		font-weight: 600;
+		color: var(--text-bright);
+	}
+
+	.card {
+		background: var(--card-bg);
+		backdrop-filter: blur(12px);
+		-webkit-backdrop-filter: blur(12px);
+		border: 1px solid var(--border-color);
+		border-radius: 24px;
+		padding: 12px;
+		margin-bottom: 24px;
+		box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+		transition: background 0.3s ease, border-color 0.3s ease;
+	}
+
+	.thermostat-main {
+		text-align: center;
+		background: var(--card-bg-alt);
+	}
+
+	.controls-grid {
+		display: grid;
+		gap: 24px;
+	}
+
+	@media (max-width: 400px) {
+		.container {
+			padding: 16px;
+		}
+	}
+</style>
