@@ -1,0 +1,137 @@
+.temp-slider {
+	position: relative;
+	margin: 20px 0;
+	padding: 20px 0;
+	user-select: none;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 20px;
+}
+
+.temp-display-large {
+	pointer-events: none;
+}
+
+.slider-container {
+	position: relative;
+	width: 100%;
+	max-width: 320px;
+	height: 40px;
+	display: flex;
+	align-items: center;
+}
+
+.horizontal-slider {
+	-webkit-appearance: none;
+	appearance: none;
+	width: 100%;
+	height: 12px;
+	background: var(--track-bg);
+	border-radius: 6px;
+	outline: none;
+	cursor: pointer;
+	position: relative;
+	z-index: 2;
+}
+
+.horizontal-slider::-webkit-slider-thumb {
+	-webkit-appearance: none;
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	background: white;
+	border: 3px solid #3b82f6;
+	cursor: pointer;
+	box-shadow: 0 0 15px var(--accent-glow);
+	transition: all 0.2s;
+}
+
+.horizontal-slider::-moz-range-thumb {
+	width: 28px;
+	height: 28px;
+	border-radius: 50%;
+	background: white;
+	border: 3px solid #3b82f6;
+	cursor: pointer;
+	box-shadow: 0 0 15px var(--accent-glow);
+	transition: all 0.2s;
+}
+
+.horizontal-slider:disabled {
+	cursor: not-allowed;
+	opacity: 0.3;
+}
+
+.slider-track-fill {
+	position: absolute;
+	left: 0;
+	height: 12px;
+	background: linear-gradient(90deg, #00f2fe, #3b82f6);
+	border-radius: 6px;
+	z-index: 1;
+	pointer-events: none;
+	transition: background 0.3s ease;
+}
+
+.slider-track-fill.heat {
+	background: linear-gradient(90deg, #ffedd5, #ea580c);
+}
+
+.slider-track-fill.cool {
+	background: linear-gradient(90deg, #1e3a8a, #93c5fd);
+}
+
+.room-temp {
+	font-size: 0.9rem;
+	color: var(--text-muted);
+	margin-bottom: 4px;
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+}
+
+.current-temp {
+	font-size: 4rem;
+	font-weight: 800;
+	line-height: 1;
+	color: var(--text-main);
+	text-shadow: 0 0 30px var(--accent-glow);
+}
+
+.temp-controls {
+	display: flex;
+	justify-content: space-between;
+	width: 80%;
+	margin: 1px auto 0;
+}
+
+.temp-controls button {
+	width: 44px;
+	height: 44px;
+	border-radius: 12px;
+	border: 1px solid var(--border-btn);
+	background: var(--btn-bg);
+	color: var(--text-main);
+	font-size: 1.5rem;
+	cursor: pointer;
+	transition: all 0.2s;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.temp-controls button:active {
+	transform: scale(0.95);
+	background: var(--card-bg-alt);
+}
+
+.temp-controls button:disabled {
+	opacity: 0.3;
+	cursor: not-allowed;
+}
+
+@media (max-width: 400px) {
+	.current-temp {
+		font-size: 3rem;
+	}
+}
