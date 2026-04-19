@@ -94,7 +94,10 @@ export function useMqttClient(
 		});
 
 		client.on('error', (err) => {
-			console.error('MQTT Connection Error:', err);
+			// Only log genuine errors, not normal disconnections
+			if (err.message && !err.message.includes('disconnecting') && !err.message.includes('client closing')) {
+				console.error('MQTT Connection Error:', err);
+			}
 			setIsConnected(false);
 		});
 
@@ -106,7 +109,10 @@ export function useMqttClient(
 	const disconnect = useCallback(() => {
 		if (spValueTimeoutRef.current) clearTimeout(spValueTimeoutRef.current);
 		if (clientRef.current) {
-			clientRef.current.end();
+			// Gracefully end the MQTT connection without treating normal disconnect as an error
+			clientRef.current.end(true, () => {
+				console.log('MQTT client disconnected');
+			});
 		}
 	}, []);
 
