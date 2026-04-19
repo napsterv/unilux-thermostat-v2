@@ -2,7 +2,17 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import mqtt from 'mqtt';
 import { ThermostatState } from '@/types';
 
-const MQTT_BROKER = 'ws://mqapi.uniluxthermostat.com:8083';
+const DEFAULT_MQTT_BROKER = 'mqapi.uniluxthermostat.com:8083';
+
+function getBrokerUrl() {
+	const env = import.meta.env as unknown as Record<string, string | undefined>;
+	const envBroker = env.VITE_MQTT_BROKER;
+	if (typeof envBroker === 'string' && envBroker.length > 0) {
+		return envBroker;
+	}
+	const scheme = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'wss' : 'ws';
+	return `${scheme}://${DEFAULT_MQTT_BROKER}`;
+}
 
 function getTopicResponse(id: string) {
 	return `${id}/v1/devices/me/rpc/response/0`;
@@ -33,10 +43,15 @@ export function useMqttClient(
 		const clientId = `uni_${Math.random().toString(16).slice(2)}`;
 		deviceIdRef.current = deviceId;
 
-		const client = mqtt.connect(MQTT_BROKER, { clientId });
+		const client = mqtt.connect(getBrokerUrl(), {
+			clientId,
+			reconnectPeriod: 5000,
+			connectTimeout: 30_000
+		});
 		clientRef.current = client;
 
 		client.on('connect', () => {
+			setIsConnected(true);
 			console.log('Connected to MQTT broker');
 			client.subscribe([
 				getTopicResponse(deviceId),
@@ -93,6 +108,15 @@ export function useMqttClient(
 			}
 		});
 
+		client.on('reconnect', () => {
+			console.log('MQTT reconnecting...');
+		});
+
+		client.on('offline', () => {
+			console.log('MQTT client offline');
+			setIsConnected(false);
+		});
+
 		client.on('error', (err) => {
 			// Only log genuine errors, not normal disconnections
 			if (err.message && !err.message.includes('disconnecting') && !err.message.includes('client closing')) {
@@ -102,6 +126,7 @@ export function useMqttClient(
 		});
 
 		client.on('close', () => {
+			console.log('MQTT connection closed');
 			setIsConnected(false);
 		});
 	}, [onStateUpdate, onRoomTempUpdate]);
@@ -136,16 +161,14 @@ export function useMqttClient(
 		}
 	}, [isConnected, onStateUpdate]);
 
-	const togglePower = useCallback(() => {
+	const togglePower = useCallback((newMode: 'On' | 'Off') => {
 		const client = clientRef.current;
 		const deviceId = deviceIdRef.current;
 
 		if (client && isConnected && deviceId) {
-			// Get current state - we'll read from parent component's state
-			// For now, just toggle
 			client.publish(
 				getTopicRequest(deviceId),
-				JSON.stringify({ method: 'remoteSetControlMode', params: 'toggle' })
+				JSON.stringify({ method: 'remoteSetControlMode', params: newMode })
 			);
 		}
 	}, [isConnected]);

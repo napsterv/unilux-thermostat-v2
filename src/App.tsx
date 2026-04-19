@@ -49,7 +49,7 @@ function App() {
 	const handleTogglePower = () => {
 		const newMode = thermostatStore.state.controlMode === 'On' ? 'Off' : 'On';
 		thermostatStore.updateState({ controlMode: newMode });
-		mqttClient.togglePower();
+		mqttClient.togglePower(newMode);
 	};
 
 	const storedDeviceId = localStorage.getItem('deviceId');
