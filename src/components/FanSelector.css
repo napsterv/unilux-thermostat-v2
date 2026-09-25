@@ -1,0 +1,123 @@
+.fan-select {
+	background: var(--card-bg);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	border: 1px solid var(--border-color);
+	border-radius: 24px;
+	padding: 16px;
+	box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+	transition: background 0.3s ease, border-color 0.3s ease;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+
+.fan-select h3 {
+	margin: 0;
+	font-size: 16px;
+	font-weight: 600;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.fan-select .icon {
+	font-size: 20px;
+}
+
+.fan-speed-control {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 12px;
+	padding: 8px;
+}
+
+.fan-btn {
+	width: 44px;
+	height: 44px;
+	border: 2px solid var(--border-color);
+	background: transparent;
+	border-radius: 10px;
+	font-size: 24px;
+	font-weight: bold;
+	cursor: pointer;
+	color: var(--text-primary);
+	transition: all 0.2s ease;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 0;
+	flex-shrink: 0;
+}
+
+.fan-btn:hover:not(:disabled) {
+	background: var(--accent-color);
+	border-color: var(--accent-color);
+	color: white;
+	transform: scale(1.05);
+}
+
+.fan-btn:active:not(:disabled) {
+	transform: scale(0.95);
+}
+
+.fan-btn:disabled {
+	opacity: 0.3;
+	cursor: not-allowed;
+}
+
+.fan-level-display {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	min-width: 140px;
+}
+
+.fan-bars {
+	display: flex;
+	align-items: flex-end;
+	justify-content: center;
+	gap: 4px;
+	height: 36px;
+}
+
+.fan-bars .bar {
+	width: 8px;
+	border-radius: 2px;
+	transition: all 0.3s ease;
+	opacity: 0.3;
+	background: var(--text-primary);
+}
+
+.fan-bars .bar:nth-child(1) {
+	height: 10px;
+}
+
+.fan-bars .bar:nth-child(2) {
+	height: 16px;
+}
+
+.fan-bars .bar:nth-child(3) {
+	height: 22px;
+}
+
+.fan-bars .bar:nth-child(4) {
+	height: 28px;
+}
+
+.fan-bars .bar.active {
+	opacity: 1;
+	box-shadow: 0 0 10px rgba(59, 130, 246, 0.8);
+}
+
+.level-text {
+	font-size: 12px;
+	font-weight: 600;
+	text-transform: uppercase;
+	color: var(--text-secondary);
+	letter-spacing: 0.5px;
+}

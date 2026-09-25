@@ -3,11 +3,14 @@
 	--text-main: #f8fafc;
 	--text-muted: #64748b;
 	--text-bright: #94a3b8;
+	--text-primary: var(--text-main);
+	--text-secondary: var(--text-muted);
 	--card-bg: rgba(30, 41, 59, 0.5);
 	--card-bg-alt: rgba(30, 41, 59, 0.7);
 	--btn-bg: rgba(15, 23, 42, 0.4);
 	--border-color: rgba(255, 255, 255, 0.05);
 	--border-btn: rgba(255, 255, 255, 0.1);
+	--accent-color: #3b82f6;
 	--accent-glow: rgba(59, 130, 246, 0.2);
 	--heading-gradient: linear-gradient(135deg, #f8fafc 0%, #94a3b8 100%);
 	--track-bg: rgba(255, 255, 255, 0.1);
@@ -18,14 +21,27 @@
 	--text-main: #0f172a;
 	--text-muted: #64748b;
 	--text-bright: #334155;
+	--text-primary: var(--text-main);
+	--text-secondary: var(--text-muted);
 	--card-bg: rgba(255, 255, 255, 0.7);
 	--card-bg-alt: rgba(255, 255, 255, 0.9);
 	--btn-bg: rgba(255, 255, 255, 0.5);
 	--border-color: rgba(15, 23, 42, 0.05);
 	--border-btn: rgba(15, 23, 42, 0.1);
+	--accent-color: #2563eb;
 	--accent-glow: rgba(59, 130, 246, 0.1);
 	--heading-gradient: linear-gradient(135deg, #1e293b 0%, #475569 100%);
 	--track-bg: rgba(15, 23, 42, 0.1);
+}
+
+* {
+	touch-action: manipulation;
+	box-sizing: border-box;
+}
+
+html, body, #root {
+	margin: 0;
+	padding: 0;
 }
 
 body {
@@ -35,9 +51,4 @@ body {
 	color: var(--text-main);
 	min-height: 100vh;
 	transition: background 0.3s ease, color 0.3s ease;
-}
-
-/* src/app.css or global stylesheet */
-* {
-	touch-action: manipulation;
 }
