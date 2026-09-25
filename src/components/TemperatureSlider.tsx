@@ -42,7 +42,7 @@ export function TemperatureSlider({
 					step={STEP}
 					value={spValue}
 					onChange={handleSliderChange}
-					disabled={controlMode !== 'On'}
+					// disabled={controlMode !== 'On'}
 					className="horizontal-slider"
 				/>
 				<div
@@ -53,14 +53,14 @@ export function TemperatureSlider({
 
 			<div className="temp-controls">
 				<button
-					disabled={controlMode !== 'On'}
+					// disabled={controlMode !== 'On'}
 					onClick={() => onAdjust(-0.5)}
 					aria-label="Decrease Temperature"
 				>
 					−
 				</button>
 				<button
-					disabled={controlMode !== 'On'}
+					// disabled={controlMode !== 'On'}
 					onClick={() => onAdjust(0.5)}
 					aria-label="Increase Temperature"
 				>

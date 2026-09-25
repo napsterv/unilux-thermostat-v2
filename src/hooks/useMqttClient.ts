@@ -45,7 +45,7 @@ export function useMqttClient(
 
 		const client = mqtt.connect(getBrokerUrl(), {
 			clientId,
-			reconnectPeriod: 5000,
+			reconnectPeriod: 1750,
 			connectTimeout: 30_000
 		});
 		clientRef.current = client;

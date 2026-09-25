@@ -9,7 +9,7 @@ import { ModeSelector } from '@/components/ModeSelector';
 import { FanSelector } from '@/components/FanSelector';
 import './App.css';
 
-const APP_VERSION = import.meta.env.APP_VERSION || '0.2.0';
+const APP_VERSION = import.meta.env.APP_VERSION || '0.2.2';
 
 function App() {
 	const thermostatStore = useThermostatStore();
@@ -89,16 +89,16 @@ function App() {
 				</section>
 
 				<section className="controls-grid">
-					<ModeSelector
-						changeOverMode={thermostatStore.state.changeOverMode}
-						controlMode={thermostatStore.state.controlMode}
-						onModeChange={mqttClient.setChangeOverMode}
-					/>
-
 					<FanSelector
 						fanMode={thermostatStore.state.fanMode}
 						controlMode={thermostatStore.state.controlMode}
 						onFanChange={mqttClient.setFanMode}
+					/>
+
+					<ModeSelector
+						changeOverMode={thermostatStore.state.changeOverMode}
+						controlMode={thermostatStore.state.controlMode}
+						onModeChange={mqttClient.setChangeOverMode}
 					/>
 				</section>
 			</main>
